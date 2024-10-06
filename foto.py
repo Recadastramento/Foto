@@ -6,7 +6,7 @@ from googleapiclient.http import MediaFileUpload
 
 # Configure as credenciais e o serviço do Google Drive
 SCOPES = ['https://www.googleapis.com/auth/drive']
-SERVICE_ACCOUNT_FILE = 'aa.json'
+SERVICE_ACCOUNT_FILE = 'G_Credentials.json'
 
 credentials = service_account.Credentials.from_service_account_file(
     SERVICE_ACCOUNT_FILE, scopes=SCOPES)
