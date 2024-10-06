@@ -7,34 +7,31 @@ from googleapiclient.http import MediaIoBaseUpload
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 
-
 def authenticate(page):
     SCOPES = ['https://www.googleapis.com/auth/drive.file']
+    cod_token = "token.json"
+    CLIENT_SECRET_FILE = "credentials.json"
+
     creds = None
     
-    if os.path.exists("Gtoken.json"):
+    # Verificar se o token de acesso já existe
+    if os.path.exists(cod_token):
         print("Carregando credenciais...")
         page.snack_bar = ft.SnackBar(ft.Text("Carregando credenciais..."), open=True)
         page.update()
-        creds = Credentials.from_authorized_user_file("Gtoken.json", SCOPES)
-    
-    if not creds or not creds.valid:
+        creds = Credentials.from_authorized_user_file(cod_token, SCOPES)
+    else:
         print("Iniciando autenticação...")
         page.snack_bar = ft.SnackBar(ft.Text("Iniciando autenticação..."), open=True)
         page.update()
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-            print("Credenciais renovadas.")
-            page.snack_bar = ft.SnackBar(ft.Text("Credenciais renovadas."), open=True)
-            page.update()
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file("Gcredentials.json", SCOPES)
-            creds = flow.run_local_server(port=0)
-            print("Autenticação concluída.")
-            page.snack_bar = ft.SnackBar(ft.Text("Autenticação concluída."), open=True)
-            page.update()
+        flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, SCOPES)
+        creds = flow.run_local_server(port=0)
+        print("Autenticação concluída.")
+        page.snack_bar = ft.SnackBar(ft.Text("Autenticação concluída."), open=True)
+        page.update()
 
-        with open("Gtoken.json", 'w') as token:
+        # Salvar as credenciais para a próxima execução
+        with open(cod_token, 'w') as token:
             token.write(creds.to_json())
             print("Token salvo.")
             page.snack_bar = ft.SnackBar(ft.Text("Token salvo."), open=True)
@@ -94,12 +91,8 @@ def main(page: ft.Page):
             creds = authenticate(page)
             if creds:
                 link = upload_to_drive(file_path, page, creds)
-                if link:
-                    print(f"Upload concluído. Link: {link}")
-                    page.snack_bar = ft.SnackBar(ft.Text(f"Upload concluído. Link: {link}"), open=True)
-                else:
-                    print("Upload falhou.")
-                    page.snack_bar = ft.SnackBar(ft.Text("Upload falhou."), open=True)
+                print(f"Upload concluído. Link: {link}")
+                page.snack_bar = ft.SnackBar(ft.Text(f"Upload concluído. Link: {link}"), open=True)
                 page.update()
 
     def on_upload(e):
