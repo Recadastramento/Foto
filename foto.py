@@ -1,53 +1,70 @@
 import flet as ft
 import os
-from google.oauth2 import service_account
+import io
+from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
+from googleapiclient.http import MediaIoBaseUpload
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
 
-# Configure as credenciais e o serviço do Google Drive
-SCOPES = ['https://www.googleapis.com/auth/drive']
-SERVICE_ACCOUNT_FILE = 'G_Credentials.json'
 
-credentials = service_account.Credentials.from_service_account_file(
-    SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+# Função para autenticar e enviar a imagem para o Google Drive
+def upload_to_drive(file_path):
+    SCOPES = ['https://www.googleapis.com/auth/drive.file']
 
-drive_service = build('drive', 'v3', credentials=credentials)
-
-def main(pagina):
-    Rc = ft.Text("Selecione uma foto")
-    foto = ft.FilePicker(on_result=file_picker_result)
+    # Autenticação via OAuth2
+    creds = None
+    if os.path.exists(t):
+        creds = Credentials.from_authorized_user_file(t, SCOPES)
     
-    # Botão para abrir o seletor de arquivos
-    botao = ft.ElevatedButton("Selecionar Foto", on_click=lambda e: foto.pick_files())
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(c, SCOPES)
+            creds = flow.run_local_server(port=0)
+        
+        with open(t, 'w') as token:
+            token.write(creds.to_json())
+    
+    service = build('drive', 'v3', credentials=creds)
 
-    pagina.add(Rc)
-    pagina.add(botao)
-    pagina.add(foto)
+    # Carregar o arquivo para o Google Drive
+    file_metadata = {'name': os.path.basename(file_path)}
+    media = MediaIoBaseUpload(io.FileIO(file_path, 'rb'), mimetype='image/jpeg')
+    file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
 
-def file_picker_result(event):
-    if event.files:
-        file_path = event.files[0].path
-        upload_file_to_drive(file_path)
-
-def upload_file_to_drive(file_path):
-    file_metadata = {
-        'name': os.path.basename(file_path),
-        'mimeType': 'image/jpeg'  # ou outro tipo de imagem
-    }
-    media = MediaFileUpload(file_path, mimetype='image/jpeg')
-
-    # Fazer o upload do arquivo
-    file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+    # Obter o link de compartilhamento
     file_id = file.get('id')
-
-    # Gerar link de compartilhamento
-    drive_service.permissions().create(
+    service.permissions().create(
         fileId=file_id,
-        body={'role': 'reader', 'type': 'anyone'},
-        fields='id'
+        body={'type': 'anyone', 'role': 'reader'}
     ).execute()
 
-    link = f"https://drive.google.com/file/d/{file_id}/view"
-    print("Link da foto:", link)
+    link = f"https://drive.google.com/uc?id={file_id}&export=download"
+    return link
 
-ft.app(main)
+# Função do botão para upload e salvar a imagem
+def main(page: ft.Page):
+    # Criando o FilePicker e adicionando-o à página
+    file_dialog = ft.FilePicker(on_result=lambda result: on_file_picked(result))
+    page.overlay.append(file_dialog)
+    
+    # Função executada após o arquivo ser selecionado
+    def on_file_picked(result):
+        if result.files:
+            file_path = result.files[0].path
+            page.snack_bar = ft.SnackBar(ft.Text("Upload in progress..."), open=True)
+            page.update()
+            link = upload_to_drive(file_path)
+            page.snack_bar = ft.SnackBar(ft.Text(f"Link gerado: {link}"), open=True)
+            page.update()
+
+    # Função chamada ao clicar no botão
+    def on_upload(e):
+        file_dialog.pick_files(allow_multiple=False)
+
+    upload_button = ft.ElevatedButton("Enviar foto", on_click=on_upload)
+    page.add(upload_button)
+
+ft.app(target=main)
