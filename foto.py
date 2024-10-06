@@ -100,7 +100,7 @@ def main(page: ft.Page):
         page.snack_bar = ft.SnackBar(ft.Text("Abrindo seletor de arquivos..."), open=True)
         page.update()
         file_dialog.pick_files(allow_multiple=False)
-
+    SOCORRO = ft.Text("aaaaaa")
     upload_button = ft.ElevatedButton("Enviar foto", on_click=on_upload)
     page.add(upload_button)
 
