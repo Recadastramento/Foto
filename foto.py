@@ -7,6 +7,7 @@ from googleapiclient.http import MediaIoBaseUpload
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 
+
 # Função para autenticar e enviar a imagem para o Google Drive
 def upload_to_drive(file_path, page):
     SCOPES = ['https://www.googleapis.com/auth/drive.file']
@@ -45,7 +46,15 @@ def upload_to_drive(file_path, page):
     page.update()
     file_metadata = {'name': os.path.basename(file_path)}
     media = MediaIoBaseUpload(io.FileIO(file_path, 'rb'), mimetype='image/jpeg')
-    file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+    
+    try:
+        file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+        page.snack_bar = ft.SnackBar(ft.Text("Arquivo carregado com sucesso!"), open=True)
+        page.update()
+    except Exception as e:
+        page.snack_bar = ft.SnackBar(ft.Text(f"Erro ao carregar o arquivo: {e}"), open=True)
+        page.update()
+        return None
 
     # Obter o link de compartilhamento
     file_id = file.get('id')
@@ -72,7 +81,10 @@ def main(page: ft.Page):
             page.snack_bar = ft.SnackBar(ft.Text("Iniciando upload..."), open=True)
             page.update()
             link = upload_to_drive(file_path, page)
-            page.snack_bar = ft.SnackBar(ft.Text(f"Upload concluído. Link: {link}"), open=True)
+            if link:
+                page.snack_bar = ft.SnackBar(ft.Text(f"Upload concluído. Link: {link}"), open=True)
+            else:
+                page.snack_bar = ft.SnackBar(ft.Text("Upload falhou."), open=True)
             page.update()
 
     # Função chamada ao clicar no botão
