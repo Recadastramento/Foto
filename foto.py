@@ -102,6 +102,7 @@ def main(page: ft.Page):
         file_dialog.pick_files(allow_multiple=False)
     SOCORRO = ft.Text("aaaaaa")
     upload_button = ft.ElevatedButton("Enviar foto", on_click=on_upload)
+    page.add(SOCORRO)
     page.add(upload_button)
 
 ft.app(target=main)
