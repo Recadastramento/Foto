@@ -1,74 +1,70 @@
+import flet as ft
 import os
 import io
-import flet as ft
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
 
-# Escopos de acesso
-SCOPES = ['https://www.googleapis.com/auth/drive.file']
+# Função para autenticar e enviar a imagem para o Google Drive
+def upload_to_drive(file_path):
+    SCOPES = ['https://www.googleapis.com/auth/drive.file']
 
-# Caminho para o arquivo de credenciais JSON
-cod_token = "Ftoken.json"
-cod_cred = "credentials.json"
-CLIENT_SECRET_FILE = cod_cred  # Altere para o seu caminho
+    # Autenticação via OAuth2
+    creds = None
+    if os.path.exists("Ftoken.json"):
+        creds = Credentials.from_authorized_user_file("Ftoken.json", SCOPES)
+    
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
+            creds = flow.run_local_server(port=0)
+        
+        with open("Ftoken.json", 'w') as token:
+            token.write(creds.to_json())
+    
+    service = build('drive', 'v3', credentials=creds)
 
-# Verificar se o token de acesso já existe
-if os.path.exists(cod_token):
-    creds = Credentials.from_authorized_user_file(cod_token, SCOPES)
-else:
-    # Se não tiver, faça o login
-    flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, SCOPES)
-    creds = flow.run_local_server(port=0)
-
-    # Salvar as credenciais para a próxima execução
-    with open(cod_token, 'w') as token:
-        token.write(creds.to_json())
-
-# Construir o serviço
-service = build('drive', 'v3', credentials=creds)
-
-# Função para fazer o upload de uma imagem
-def upload_image(file_path, page):
-    if not file_path:
-        page.snack_bar = ft.SnackBar(ft.Text("Nenhum arquivo foi selecionado."), open=True)
-        page.update()
-        return
-
-    page.snack_bar = ft.SnackBar(ft.Text(f"Iniciando o upload do arquivo: {file_path}..."), open=True)
-    page.update()
-
+    # Carregar o arquivo para o Google Drive
     file_metadata = {'name': os.path.basename(file_path)}
     media = MediaIoBaseUpload(io.FileIO(file_path, 'rb'), mimetype='image/jpeg')
-    
-    try:
-        file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-        page.snack_bar = ft.SnackBar(ft.Text(f"Arquivo carregado com sucesso! ID do arquivo: {file.get('id')}"), open=True)
-    except Exception as e:
-        page.snack_bar = ft.SnackBar(ft.Text(f"Erro ao carregar o arquivo: {str(e)}"), open=True)
-    
-    page.update()
+    file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
 
+    # Obter o link de compartilhamento
+    file_id = file.get('id')
+    service.permissions().create(
+        fileId=file_id,
+        body={'type': 'anyone', 'role': 'reader'}
+    ).execute()
+
+    link = f"https://drive.google.com/uc?id={file_id}&export=download"
+    return link
+
+# Função do botão para upload e salvar a imagem
 def main(page: ft.Page):
+    # Criando o FilePicker e adicionando-o à página
     file_dialog = ft.FilePicker(on_result=lambda result: on_file_picked(result, page))
     page.overlay.append(file_dialog)
-
+    
+    # Função executada após o arquivo ser selecionado
     def on_file_picked(result, page):
         if result.files:
             file_path = result.files[0].path
-            page.snack_bar = ft.SnackBar(ft.Text(f"Arquivo selecionado: {file_path}"), open=True)
-            page.update()
+            if file_path:  # Verifique se o file_path não é None
+                page.snack_bar = ft.SnackBar(ft.Text("Upload in progress..."), open=True)
+                page.update()
+                link = upload_to_drive(file_path)
+                page.snack_bar = ft.SnackBar(ft.Text(f"Link gerado: {link}"), open=True)
+                page.update()
+            else:
+                page.snack_bar = ft.SnackBar(ft.Text("Nenhum arquivo selecionado."), open=True)
+                page.update()
 
-            # Chamar a função de upload
-            upload_image(file_path, page)
-        else:
-            page.snack_bar = ft.SnackBar(ft.Text("Nenhum arquivo selecionado."), open=True)
-            page.update()
-
-    def on_upload(e):
-        page.snack_bar = ft.SnackBar(ft.Text("Abrindo seletor de arquivos..."), open=True)
-        page.update()
+    # Função chamada ao clicar no botão
+    def on_upload(evento):
         file_dialog.pick_files(allow_multiple=False)
 
     upload_button = ft.ElevatedButton("Enviar foto", on_click=on_upload)
