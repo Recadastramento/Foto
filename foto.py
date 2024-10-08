@@ -10,7 +10,7 @@ from googleapiclient.http import MediaIoBaseUpload
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
 
 # Caminho para o arquivo de credenciais JSON
-cod_token = "token.json"
+cod_token = "Ftoken.json"
 cod_cred = "credentials.json"
 CLIENT_SECRET_FILE = cod_cred  # Altere para o seu caminho
 
